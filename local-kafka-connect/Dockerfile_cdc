@@ -1,0 +1,36 @@
+FROM confluentinc/cp-kafka-connect-base:7.6.0
+
+# INSTALL Plugins
+RUN confluent-hub install \
+    --no-prompt \
+    debezium/debezium-connector-postgresql:2.5.4
+
+ENV DEFAULT_CLUSTER_NAME=default-cluster
+
+# [START] Configure management topics
+ENV CONNECT_CONFIG_STORAGE_TOPIC=${DEFAULT_CLUSTER_NAME}.config \
+    CONNECT_OFFSET_STORAGE_TOPIC=${DEFAULT_CLUSTER_NAME}.offset \
+    CONNECT_STATUS_STORAGE_TOPIC=${DEFAULT_CLUSTER_NAME}.status
+
+ENV CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR=1 \
+    CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR=1 \
+    CONNECT_STATUS_STORAGE_REPLICATION_FACTOR=1
+
+ENV CONNECT_CONFIG_STORAGE_CLEANUP_POLICY=compact \
+    CONNECT_OFFSET_STORAGE_CLEANUP_POLICY=compact \
+    CONNECT_STATUS_STORAGE_CLEANUP_POLICY=compact
+# [END] Configure management topics
+
+# [START] Configure configuration consumer group
+ENV CONNECT_GROUP_ID=${DEFAULT_CLUSTER_NAME}
+# [END] Configure configuration consumer group
+
+# [START] Define configuration provider
+ENV CONNECT_CONFIG_PROVIDERS=dir,env,file \
+    CONNECT_CONFIG_PROVIDERS_DIR_CLASS=org.apache.kafka.common.config.provider.DirectoryConfigProvider \
+    CONNECT_CONFIG_PROVIDERS_ENV_CLASS=org.apache.kafka.common.config.provider.DirectoryConfigProvider \
+    CONNECT_CONFIG_PROVIDERS_FILE_CLASS=org.apache.kafka.common.config.provider.DirectoryConfigProvider
+# [END] Define configuration provider
+
+ENV CONNECT_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter \
+    CONNECT_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
