@@ -1,0 +1,98 @@
+version: "3.8"
+services:
+  broker:
+    image: confluentinc/confluent-local:latest
+    hostname: broker
+    container_name: broker
+    ports:
+      - "9092:9092"
+    platform: linux/amd64
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://broker:9092,CONTROLLER://broker:29093'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    healthcheck: &hc
+      interval: 10s
+      retries: 10
+      start_period: 10s
+      timeout: 5s
+      test: curl -s localhost:8082 > /dev/null
+
+  connect-cluster:
+    container_name: connect-cluster
+    hostname: connect-cluster
+    image: lip17/cdc-connector-cluster:0.0.1
+    ports:
+      - 8083
+    depends_on:
+      broker:
+        condition: service_healthy
+    environment:
+      - CONNECT_BOOTSTRAP_SERVERS=broker:9092
+      - CONNECT_REST_ADVERTISED_HOST_NAME=connect-cluster
+      - CONNECT_GROUP_ID=local-test
+      - DATABASE_HOSTNAME=postgres
+      - DATABASE_DBNAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+    healthcheck:
+      <<: *hc
+      test: curl -f localhost:8083/connectors
+    restart: on-failure
+
+  connector-configure:
+    container_name: connector-configure
+    image: lip17/connector-configure:0.0.1
+    depends_on:
+      connect-cluster:
+        condition: service_healthy
+    environment:
+      - CONNECTOR_NAMES=local_cdc
+      - CLUSTER_ENV=local
+      - CONNECT_CLUSTER_HOST=connect-cluster
+
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: password
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    ports:
+      - "5432:5432"
+    restart: always
+    command:
+      - postgres
+      - "-c"
+      - wal_level=logical
+
+  control-center:
+    container_name: control-center
+    hostname: control-center
+    image: confluentinc/cp-enterprise-control-center:latest
+    depends_on:
+      broker:
+        condition: service_healthy
+      connect-cluster:
+        condition: service_healthy
+    ports:
+      - "9021:9021"
+    environment:
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: 'broker:9092'
+      CONTROL_CENTER_CONNECT_CONNECT-DEFAULT_CLUSTER: 'connect-cluster:8083'
+      CONTROL_CENTER_CONNECT_HEALTHCHECK_ENDPOINT: '/connectors'
+      CONTROL_CENTER_REPLICATION_FACTOR: 1
+      CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
+      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
+      CONFLUENT_METRICS_TOPIC_REPLICATION: 1
+      PORT: 9021

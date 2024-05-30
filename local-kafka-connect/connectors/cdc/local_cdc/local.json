@@ -1,0 +1,8 @@
+{
+  "name": "local_cdc",
+  "config": {
+    "name": "local_cdc",
+    "slot.name": "local_cdc_source",
+    "topic.prefix": "local_cdc_source"
+  }
+}

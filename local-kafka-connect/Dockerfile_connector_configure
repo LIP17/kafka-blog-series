@@ -1,0 +1,20 @@
+# based on python3.12 image in case the script getting too complicated
+FROM python:3.12.3-bullseye
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends jq \
+    vim \
+    wget
+
+# load all the connectors configuration into one
+RUN mkdir -p /setup/connectors/cdc
+ADD ./connectors/cdc /setup/connectors/cdc/
+
+# copy entrypoint file
+COPY ./scripts/cdc/entrypoint.sh /setup/entrypoint.sh
+RUN chmod +x /setup/entrypoint.sh
+
+# use this ENVAR to pass in target connectors to be deployed
+ENV CLUSTER_ENV=RUNNING_ENV
+ENV CONNECTOR_NAMES=TARGET_CONNECTORS
+ENTRYPOINT ["/setup/entrypoint.sh"]

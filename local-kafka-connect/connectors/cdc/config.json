@@ -1,0 +1,29 @@
+{
+  "name": "[NEED OVERRIDE]",
+  "config": {
+    "name": "[NEED OVERRIDE]",
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "database.hostname": "${env:DATABASE_HOSTNAME}",
+    "database.port": "5432",
+    "database.dbname": "${env:DATABASE_DBNAME}",
+    "database.user": "${env:DATABASE_USER}",
+    "database.password": "${env:DATABASE_PASSWORD}",
+    "heartbeat.interval.ms": "60000",
+    "heartbeat.action.query": "CREATE TABLE IF NOT EXISTS heart_beat_dbz ( id SERIAL PRIMARY KEY, t TIMESTAMP ); INSERT INTO heart_beat_dbz ( id, t ) VALUES ( 1, now() ) ON CONFLICT(id) DO UPDATE SET t=EXCLUDED.t;",
+    "database.initial.statements": "CREATE TABLE IF NOT EXISTS heart_beat_dbz ( id SERIAL PRIMARY KEY, t TIMESTAMP ); INSERT INTO heart_beat_dbz ( id, t ) VALUES ( 1, now() ) ON CONFLICT(id) DO UPDATE SET t=EXCLUDED.t;",
+    "slot.name": "[NEED OVERRIDE]",
+    "topic.heartbeat.prefix": "__debezium-heartbeat",
+    "table.include.list": "public.*",
+    "topic.prefix": "[NEED OVERRIDE]",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "slot.drop.on.stop": "true",
+    "topic.creation.enable": "true",
+    "topic.creation.default.partitions": "1",
+    "topic.creation.default.replication.factor": "-1",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "snapshot.mode": "never"
+  }
+}
