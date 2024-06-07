@@ -1,6 +1,5 @@
-1. How to install Celery
-2. How to install redis
-3. register task
+
+
 4. apply_async vs delay
 apply_async has more parameters
 countdown: Delay execution for a specified number of seconds. relative time
