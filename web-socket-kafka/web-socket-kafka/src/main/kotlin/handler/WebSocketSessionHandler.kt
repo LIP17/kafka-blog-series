@@ -7,6 +7,7 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import registry.UserSessionRegistry
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.websocket.readReason
 
 
 class WebSocketSessionHandler(
@@ -16,6 +17,7 @@ class WebSocketSessionHandler(
     companion object {
         val logger = KotlinLogging.logger { WebSocketSessionHandler::class.java.name }
     }
+
     suspend fun handle(session: WebSocketServerSession) {
         val userId = session.call.parameters[USER_ID] ?: throw MissingRequestParameterException(USER_ID)
         userSessionRegistry.register(UserSessionRegistry.resolveIdentifier(userId), session)
@@ -25,19 +27,28 @@ class WebSocketSessionHandler(
 
     private suspend fun confirmReady(session: WebSocketServerSession, userId: String) {
         session.send(Frame.Text("Session Created"))
-        logger.info{"Session Created With User $userId"}
+        logger.info { "Session Created With User $userId" }
     }
 
     private suspend fun handleIncomingMessage(session: WebSocketServerSession, userId: String) {
-
         for (frame in session.incoming) {
-            if (frame is Frame.Text) {
-                val receivedText = frame.readText()
-                session.send(Frame.Text("You send $receivedText"))
+            when (frame) {
+                is Frame.Text -> {
+                    val receivedText = frame.readText()
+                    session.send(Frame.Text("You send $receivedText"))
+                }
+
+                is Frame.Close -> {
+                    logger.info { "Session Closed With User $userId, ${frame.readReason()}" }
+                    return
+                }
+
+                else -> {
+                    logger.info { "Received unused type of frame from user $userId" }
+                }
             }
+
+
         }
-
-        logger.info{ "Session Closed With User $userId" }
-
     }
 }
