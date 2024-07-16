@@ -15,12 +15,12 @@ class WebSocketSessionHandler(
 ) {
 
     companion object {
-        val logger = KotlinLogging.logger { WebSocketSessionHandler::class.java.name }
+        private val logger = KotlinLogging.logger { WebSocketSessionHandler::class.java.name }
     }
 
     suspend fun handle(session: WebSocketServerSession) {
         val userId = session.call.parameters[USER_ID] ?: throw MissingRequestParameterException(USER_ID)
-        userSessionRegistry.register(UserSessionRegistry.resolveIdentifier(userId), session)
+        userSessionRegistry.registerUser(userId, session)
         confirmReady(session, userId)
         handleIncomingMessage(session, userId)
     }
@@ -40,6 +40,7 @@ class WebSocketSessionHandler(
 
                 is Frame.Close -> {
                     logger.info { "Session Closed With User $userId, ${frame.readReason()}" }
+                    userSessionRegistry.unregisterUser(userId)
                     return
                 }
 
