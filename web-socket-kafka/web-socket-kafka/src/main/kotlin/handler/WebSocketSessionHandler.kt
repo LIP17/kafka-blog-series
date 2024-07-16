@@ -5,7 +5,6 @@ import io.ktor.server.plugins.MissingRequestParameterException
 import io.ktor.server.websocket.WebSocketServerSession
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
-import org.slf4j.LoggerFactory
 import registry.UserSessionRegistry
 import io.github.oshai.kotlinlogging.KotlinLogging
 
@@ -15,7 +14,7 @@ class WebSocketSessionHandler(
 ) {
 
     companion object {
-        val logger = KotlinLogging.logger {  }
+        val logger = KotlinLogging.logger { WebSocketSessionHandler::class.java.name }
     }
     suspend fun handle(session: WebSocketServerSession) {
         val userId = session.call.parameters[USER_ID] ?: throw MissingRequestParameterException(USER_ID)

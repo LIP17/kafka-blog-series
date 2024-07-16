@@ -17,7 +17,6 @@ object ServerStarter {
 
     private val userSessionRegistry = UserSessionRegistry()
     private val newSessionHandler = WebSocketSessionHandler(userSessionRegistry)
-    private val logger = KotlinLogging.logger(ServerStarter.javaClass.name)
 
     @JvmStatic
     fun main(args: Array<String>) {
