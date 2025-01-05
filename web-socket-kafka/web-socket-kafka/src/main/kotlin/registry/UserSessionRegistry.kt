@@ -17,14 +17,15 @@ class UserSessionRegistry {
     private val userSession = ConcurrentHashMap<String, WebSocketSession>()
 
     fun registerUser(userId: String, session: WebSocketSession) {
+        logger.info { "Register session with user $userId" }
         val identifier = resolveIdentifier(userId)
-        logger.info { "Register session with identifier $identifier" }
         userSession[identifier] = session
     }
 
     fun unregisterUser(userId: String) {
+        logger.info { "Unregister session with user $userId" }
         val identifier = resolveIdentifier(userId)
-        userSession.remove(identifier);
+        userSession.remove(identifier)
     }
 
     fun get(identifier: String): WebSocketSession? {

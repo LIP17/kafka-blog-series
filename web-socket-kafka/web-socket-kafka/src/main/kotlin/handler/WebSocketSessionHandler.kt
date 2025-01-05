@@ -1,6 +1,8 @@
 package handler
 
 import WebSessionConstants.USER_ID
+import client.KafkaMessageClient
+import com.fasterxml.jackson.module.kotlin.readValue
 import io.ktor.server.plugins.MissingRequestParameterException
 import io.ktor.server.websocket.WebSocketServerSession
 import io.ktor.websocket.Frame
@@ -8,10 +10,13 @@ import io.ktor.websocket.readText
 import registry.UserSessionRegistry
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.websocket.readReason
+import model.UserMessage
+import serialization.JsonMapper
 
 
 class WebSocketSessionHandler(
-    private val userSessionRegistry: UserSessionRegistry
+    private val userSessionRegistry: UserSessionRegistry,
+    private val kafkaMessageClient: KafkaMessageClient,
 ) {
 
     companion object {
@@ -26,7 +31,7 @@ class WebSocketSessionHandler(
     }
 
     private suspend fun confirmReady(session: WebSocketServerSession, userId: String) {
-        session.send(Frame.Text("Session Created"))
+        session.send(Frame.Text("Websocket Session Created"))
         logger.info { "Session Created With User $userId" }
     }
 
@@ -34,8 +39,8 @@ class WebSocketSessionHandler(
         for (frame in session.incoming) {
             when (frame) {
                 is Frame.Text -> {
-                    val receivedText = frame.readText()
-                    session.send(Frame.Text("You send $receivedText"))
+                    val userMessage: UserMessage = JsonMapper.objectMapper.readValue(frame.readText())
+                    kafkaMessageClient.messageReceived(userMessage)
                 }
 
                 is Frame.Close -> {
@@ -48,8 +53,6 @@ class WebSocketSessionHandler(
                     logger.info { "Received unused type of frame from user $userId" }
                 }
             }
-
-
         }
     }
 }
