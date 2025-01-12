@@ -1,34 +1,43 @@
 package registry
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.websocket.WebSocketSession
+import model.UserSession
 import java.util.concurrent.ConcurrentHashMap
 
 class UserSessionRegistry {
 
     companion object {
         private val logger = KotlinLogging.logger { UserSessionRegistry::class.java.name }
-        fun resolveIdentifier(userId: String): String {
-            return userId
+    }
+
+    // 1 user could have multiple device, hence multiple active sessions
+    private val userSessionMap = ConcurrentHashMap<String, MutableSet<UserSession>>()
+
+    fun registerUserSession(session: UserSession) {
+        logger.info { "Register session for user ${session.userId}" }
+        userSessionMap.compute(session.userId) { _, sessions ->
+            val updatedSessions = sessions ?: mutableSetOf()
+            if (!updatedSessions.add(session)) {
+                // Session was already present, so we return the same set
+                return@compute updatedSessions
+            }
+            updatedSessions
         }
     }
 
-
-    private val userSession = ConcurrentHashMap<String, WebSocketSession>()
-
-    fun registerUser(userId: String, session: WebSocketSession) {
-        logger.info { "Register session with user $userId" }
-        val identifier = resolveIdentifier(userId)
-        userSession[identifier] = session
+    // one user can have multiple active sessions
+    fun getUserSessions(userId: String): List<UserSession> {
+        return userSessionMap[userId]?.toList() ?: listOf()
     }
 
-    fun unregisterUser(userId: String) {
-        logger.info { "Unregister session with user $userId" }
-        val identifier = resolveIdentifier(userId)
-        userSession.remove(identifier)
+    fun listAllSessions(): List<UserSession> {
+        return userSessionMap.flatMap { it.value.toList() }
     }
 
-    fun get(identifier: String): WebSocketSession? {
-        return userSession[identifier]
+    fun unregisterUser(session: UserSession) {
+        logger.info { "Unregister session for user session $session " }
+        userSessionMap.computeIfPresent(session.userId) { _, sessions ->
+            sessions.apply { sessions.remove(session) }
+        }
     }
 }

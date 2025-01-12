@@ -1,43 +1,63 @@
 package handler
 
-import client.KafkaMessageClient
-import com.fasterxml.jackson.module.kotlin.readValue
+import client.SessionRegistryClient
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCall
-import io.ktor.server.request.receive
-import io.ktor.server.request.receiveText
-import io.ktor.server.response.respond
-import io.ktor.server.response.respondText
-
-import io.ktor.websocket.Frame
-import io.ktor.websocket.readText
+import io.ktor.client.request.host
+import io.ktor.client.request.port
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import model.UserMessage
+import model.UserSession
 import registry.UserSessionRegistry
+import io.ktor.client.HttpClient
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.http.path
 import serialization.JsonMapper
 
-class MessageRedirectHandler (
-    private val userSessionRegistry: UserSessionRegistry,
-    private val kafkaMessageClient: KafkaMessageClient
+class MessageRedirectHandler(
+    private val sessionRegistry: UserSessionRegistry,
+    private val sessionRegistryClient: SessionRegistryClient,
+    private val httpClient: HttpClient,
 ) {
+
     companion object {
         private val logger = KotlinLogging.logger { MessageRedirectHandler::class.java.name }
     }
 
-    suspend fun handle(call: ApplicationCall) {
-        val rawMessage = call.receiveText()
-        val userMessage = JsonMapper.objectMapper.readValue<UserMessage>(rawMessage)
-        val userSession = userSessionRegistry.get(userMessage.receiverId)
+    /**
+     * Locate any existing session and send the message out
+     */
+    suspend fun dispatchMessage(message: UserMessage) {
+        val userSessions = fetchUserSessions(message.receiverId)
 
-        if (userSession == null) {
-            logger.info { "Enqueue pending message" }
-            kafkaMessageClient.userMessagePending(userMessage)
+        if (userSessions.isEmpty()) {
             return
         }
 
-        logger.info { "Redirect message from ${userMessage.senderId} to ${userMessage.receiverId}" }
-        userSession.send(Frame.Text(JsonMapper.objectMapper.writeValueAsString(userMessage)))
+        userSessions.map { userSession ->
+            val resp = httpClient.post {
+                this.contentType(io.ktor.http.ContentType.Application.Json)
+                this.host = userSession.host
+                this.port = userSession.port
+                this.setBody(JsonMapper.objectMapper.writeValueAsString(message))
+                url {
+                    path("send-message")
+                }
+            }
+            logger.info { "Redirect message response status ${resp.status}" }
+            if (resp.status == HttpStatusCode.NotFound) {
+                sessionRegistry.unregisterUser(userSession)
+            }
+        }
+    }
 
-        call.respond(HttpStatusCode.OK)
+    private suspend fun fetchUserSessions(userId: String): List<UserSession> {
+        val cachedUserSessions = sessionRegistry.getUserSessions(userId)
+        if (cachedUserSessions.isNotEmpty()) return cachedUserSessions
+
+        val userSessions = sessionRegistryClient.getUserSessions(userId)
+
+        return userSessions.onEach { sessionRegistry.registerUserSession(it) }
     }
 }
